@@ -1,4 +1,4 @@
-const CACHE_NAME = 'workcal-v1';
+const CACHE_NAME = 'workcal-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -12,10 +12,7 @@ const ASSETS = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS).catch(() => {
-        // If some CDN assets fail, continue anyway
-        return cache.add('/index.html');
-      });
+      return cache.addAll(ASSETS).catch(() => cache.add('/index.html'));
     })
   );
   self.skipWaiting();
@@ -24,10 +21,11 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      ).then(() => self.clients.claim())
     )
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
