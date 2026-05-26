@@ -1,4 +1,4 @@
-const CACHE_NAME = 'workcal-v2';
+const CACHE_NAME = 'workcal-v3';
 const ASSETS = [
   '/',
   '/index.html',
@@ -29,20 +29,39 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(response => {
-        if (response && response.status === 200 && response.type !== 'opaque') {
+  const url = new URL(e.request.url);
+  const isHTML = e.request.destination === 'document' ||
+                 url.pathname.endsWith('.html') ||
+                 url.pathname === '/';
+
+  if (isHTML) {
+    // Network First for HTML — always get latest, fallback to cache if offline
+    e.respondWith(
+      fetch(e.request)
+        .then(response => {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-        }
-        return response;
-      }).catch(() => {
-        if (e.request.destination === 'document') {
-          return caches.match('/index.html');
-        }
-      });
-    })
-  );
+          return response;
+        })
+        .catch(() => caches.match(e.request))
+    );
+  } else {
+    // Cache First for CDN assets (JS, CSS, etc.)
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        if (cached) return cached;
+        return fetch(e.request).then(response => {
+          if (response && response.status === 200 && response.type !== 'opaque') {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+          }
+          return response;
+        }).catch(() => {
+          if (e.request.destination === 'document') {
+            return caches.match('/index.html');
+          }
+        });
+      })
+    );
+  }
 });
